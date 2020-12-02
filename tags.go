@@ -32,7 +32,7 @@ type ConfigTags struct {
 }
 
 func getTags(st reflect.StructTag) *ConfigTags {
-	ct := ConfigTags{
+	tags := ConfigTags{
 		Config:    st.Get("config"),
 		Default:   st.Get("default"),
 		Required:  st.Get("required") == "true",
@@ -42,12 +42,12 @@ func getTags(st reflect.StructTag) *ConfigTags {
 		Format:    st.Get("format"),
 	}
 
-	if ct.Config == ignoreCharacter {
-		ct.Ignore = true
+	if tags.Config == ignoreCharacter {
+		tags.Ignore = true
 	}
-	if ct.Separator == "" {
-		ct.Separator = defaultSeparator
+	if tags.Separator == "" {
+		tags.Separator = defaultSeparator
 	}
 
-	return &ct
+	return &tags
 }

@@ -1,7 +1,6 @@
 package gonfig
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,10 +10,11 @@ import (
 	"time"
 )
 
-var ErrInvalidInput = errors.New("gonfig: input must be a struct pointer")
-
+// TODO: separate this into another struct
 type Gonfig struct {
-	Prefix string
+	Prefix     string
+	structName string
+	ce         ConfigErrors
 }
 
 func New(prefix string) *Gonfig {
@@ -23,48 +23,68 @@ func New(prefix string) *Gonfig {
 	}
 }
 
-func (g *Gonfig) Into(i interface{}) error {
+// Input must be a non-nil struct pointer
+func checkInput(i interface{}) error {
+	t := reflect.TypeOf(i)
 	v := reflect.ValueOf(i)
-	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return ErrInvalidInput
-	}
 
-	v = v.Elem()
-	var prefix []string
-	if g.Prefix != "" {
-		prefix = append(prefix, g.Prefix)
+	if t == nil ||
+		t.Kind() != reflect.Ptr ||
+		v.IsNil() ||
+		t.Elem().Kind() != reflect.Struct {
+		return &InvalidInputError{
+			Type:  t,
+			Value: v,
+		}
 	}
-
-	populate(v, "", &ConfigTags{}, prefix...)
 
 	return nil
 }
 
-func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
-	if ct.Ignore {
+func (g *Gonfig) Into(i interface{}) error {
+	if err := checkInput(i); err != nil {
+		return err
+	}
+
+	v := reflect.ValueOf(i)
+	g.structName = v.Type().String()
+	v = v.Elem()
+
+	g.populate(v, "", &ConfigTags{})
+
+	if len(g.ce) != 0 {
+		return g.ce
+	}
+
+	return nil
+}
+
+func (g *Gonfig) populate(v reflect.Value, value string, tags *ConfigTags, path ...string) {
+	if tags.Ignore || !v.CanSet() {
 		return
 	}
-	if !v.CanSet() {
-		fmt.Println("can not set")
-		return
-	}
-	if value == "" {
-		key := ct.Config
-		if key == "" {
-			key = toScreamingSnakeCase(path)
+
+	// TODO: it should not called here, if struct => bug!
+	if v.Kind() != reflect.Struct && value == "" {
+		var key string
+		if tags.Config != "" {
+			key = g.Prefix + tags.Config
+		} else {
+			key = g.Prefix + toScreamingSnakeCase(path)
 		}
 
 		var exists bool
 		value, exists = os.LookupEnv(key)
 		if !exists {
-			if ct.Required {
+			if tags.Required {
+				g.collectError(fmt.Errorf(missingValueErrFormat, ErrMissingValue, g.getPath(path)))
 				return
+			} else {
+				value = tags.Default
 			}
-
-			value = ct.Default
 		}
 
-		if ct.Expand {
+		if tags.Expand {
 			value = os.ExpandEnv(value)
 		}
 	}
@@ -74,48 +94,129 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 		v.SetString(value)
 
 	case reflect.Bool:
-		b, _ := strconv.ParseBool(value)
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			g.collectError(
+				fmt.Errorf(
+					parseErrFormat,
+					ErrParsing, g.getPath(path), err,
+				),
+			)
+			return
+		}
+
 		v.SetBool(b)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		var d time.Duration
 		var i int64
+		var err error
 
-		if v.Type().PkgPath() == "time" && v.Type().Name() == "Duration" {
-			d, _ := time.ParseDuration(value)
+		if isDuration(v) {
+			d, err = time.ParseDuration(value)
+			if err != nil {
+				g.collectError(
+					fmt.Errorf(
+						parseErrFormat,
+						ErrParsing, g.getPath(path), err,
+					),
+				)
+				return
+			}
+
 			i = int64(d)
 		} else {
-			i, _ = strconv.ParseInt(value, 0, 64)
+			i, err = strconv.ParseInt(value, 0, 64)
+			if err != nil {
+				g.collectError(
+					fmt.Errorf(
+						parseErrFormat,
+						ErrParsing, g.getPath(path), err,
+					),
+				)
+				return
+			}
 		}
 
 		if v.OverflowInt(i) {
-			fmt.Printf("gonfig: value %v overflows type %v\n", i, v.Kind())
+			g.collectError(
+				fmt.Errorf(
+					overflowErrFormat,
+					ErrValueOverflow, i, v.Kind(), g.getPath(path),
+				),
+			)
 			return
 		}
 
 		v.SetInt(i)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		i, _ := strconv.ParseUint(value, 0, 64)
+		i, err := strconv.ParseUint(value, 0, 64)
+		if err != nil {
+			g.collectError(
+				fmt.Errorf(
+					parseErrFormat,
+					ErrParsing, g.getPath(path), err,
+				),
+			)
+			return
+		}
+
 		if v.OverflowUint(i) {
-			fmt.Printf("gonfig: value %v overflows type %v\n", i, v.Kind())
+			g.collectError(
+				fmt.Errorf(
+					overflowErrFormat,
+					ErrValueOverflow, i, v.Kind(), g.getPath(path),
+				),
+			)
 			return
 		}
 
 		v.SetUint(i)
 
 	case reflect.Float32, reflect.Float64:
-		f, _ := strconv.ParseFloat(value, v.Type().Bits())
+		f, err := strconv.ParseFloat(value, v.Type().Bits())
+		if err != nil {
+			g.collectError(
+				fmt.Errorf(
+					parseErrFormat,
+					ErrParsing, g.getPath(path), err,
+				),
+			)
+			return
+		}
+
 		if v.OverflowFloat(f) {
-			fmt.Printf("gonfig: value %v overflows type %v\n", f, v.Kind())
+			g.collectError(
+				fmt.Errorf(
+					overflowErrFormat,
+					ErrValueOverflow, f, v.Kind(), g.getPath(path),
+				),
+			)
 			return
 		}
 
 		v.SetFloat(f)
 
 	case reflect.Complex64, reflect.Complex128:
-		c, _ := strconv.ParseComplex(value, v.Type().Bits())
+		c, err := strconv.ParseComplex(value, v.Type().Bits())
+		if err != nil {
+			g.collectError(
+				fmt.Errorf(
+					parseErrFormat,
+					ErrParsing, g.getPath(path), err,
+				),
+			)
+			return
+		}
+
 		if v.OverflowComplex(c) {
-			fmt.Printf("gonfig: value %v overflows type %v\n", c, v.Kind())
+			g.collectError(
+				fmt.Errorf(
+					overflowErrFormat,
+					ErrValueOverflow, c, v.Kind(), g.getPath(path),
+				),
+			)
 			return
 		}
 
@@ -130,12 +231,17 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 			reflect.Func,
 			reflect.Interface,
 			reflect.UnsafePointer:
-			fmt.Printf("gonfig: cannot handle kind slice/array of %v\n", v.Type().Elem().Kind())
+			g.collectError(
+				fmt.Errorf(
+					unsupportedElementTypeErrFormat,
+					ErrUnsupportedType, v.Type().Elem().Kind(), g.getPath(path),
+				),
+			)
 			return
 		}
 
 		var items []string
-		for _, v := range strings.Split(value, ct.Separator) {
+		for _, v := range strings.Split(value, tags.Separator) {
 			item := strings.TrimSpace(v)
 			if len(item) > 0 {
 				items = append(items, item)
@@ -146,12 +252,13 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 		}
 
 		switch v.Kind() {
+		// FIXME: in case of parse error slice should not get initialized
 		case reflect.Slice:
 			size := len(items)
 			sv := reflect.MakeSlice(reflect.SliceOf(v.Type().Elem()), size, size)
 
 			for i := range items {
-				populate(sv.Index(i), items[i], ct, path...)
+				g.populate(sv.Index(i), items[i], tags, path...)
 			}
 
 			v.Set(sv)
@@ -166,7 +273,7 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 			av := reflect.New(at).Elem()
 
 			for i := 0; i < size; i++ {
-				populate(av.Index(i), items[i], ct, path...)
+				g.populate(av.Index(i), items[i], tags, path...)
 			}
 
 			v.Set(av)
@@ -177,23 +284,43 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 
 	case reflect.Ptr:
 		pv := reflect.New(v.Type().Elem())
-		populate(pv.Elem(), value, ct, path...)
+		g.populate(pv.Elem(), value, tags, path...)
 		v.Set(pv)
 
 	case reflect.Struct:
-		if v.Type().Name() == "Time" {
-			format := ct.Format
+		if isTime(v) {
+			format := tags.Format
 			if format == "" {
 				format = time.RFC3339
 			}
 
-			t, _ := time.Parse(format, value)
+			t, err := time.Parse(format, value)
+			if err != nil {
+				g.collectError(
+					fmt.Errorf(
+						parseErrFormat,
+						ErrParsing, g.getPath(path), err,
+					),
+				)
+				return
+			}
+
 			v.Set(reflect.ValueOf(t))
 			return
 		}
 
-		if v.Type().Name() == "URL" {
-			u, _ := url.Parse(value)
+		if isURL(v) {
+			u, err := url.Parse(value)
+			if err != nil {
+				g.collectError(
+					fmt.Errorf(
+						parseErrFormat,
+						ErrParsing, g.getPath(path), err,
+					),
+				)
+				return
+			}
+
 			v.Set(reflect.ValueOf(*u))
 			return
 		}
@@ -201,7 +328,7 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 		for i := 0; i < v.NumField(); i++ {
 			currentPath := append(path, v.Type().Field(i).Name)
 
-			populate(
+			g.populate(
 				v.Field(i),
 				value,
 				getTags(v.Type().Field(i).Tag),
@@ -210,6 +337,31 @@ func populate(v reflect.Value, value string, ct *ConfigTags, path ...string) {
 		}
 
 	default:
-		fmt.Printf("gonfig: cannot handle kind %v\n", v.Kind())
+		g.collectError(
+			fmt.Errorf(
+				unsupportedTypeErrFormat,
+				ErrUnsupportedType, v.Kind(), g.getPath(path),
+			),
+		)
 	}
+}
+
+func (g *Gonfig) collectError(e error) {
+	g.ce = append(g.ce, e)
+}
+
+func (g *Gonfig) getPath(paths []string) string {
+	return g.structName + "." + strings.Join(paths, ".")
+}
+
+func isDuration(v reflect.Value) bool {
+	return v.Type().PkgPath() == "time" && v.Type().Name() == "Duration"
+}
+
+func isTime(v reflect.Value) bool {
+	return v.Type().PkgPath() == "time" && v.Type().Name() == "Time"
+}
+
+func isURL(v reflect.Value) bool {
+	return v.Type().PkgPath() == "net/url" && v.Type().Name() == "URL"
 }
