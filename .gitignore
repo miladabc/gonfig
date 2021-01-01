@@ -19,6 +19,3 @@
 # vendor
 
 .DS_Store
-
-.env*
-!.env.example

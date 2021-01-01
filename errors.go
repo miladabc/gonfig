@@ -10,8 +10,14 @@ var (
 	// Can not handle specified type
 	ErrUnsupportedType = errors.New("unsupported type")
 
+	// Only ".json", ".yml", ".yaml" and ".env" file types are supported
+	ErrUnsupportedFileExt = errors.New("unsupported file extension")
+
+	// Provider could not find value with specified key
+	ErrKeyNotFound = errors.New("key not found")
+
 	// Field is required but no value provided
-	ErrMissingValue = errors.New("missing value")
+	ErrRequiredField = errors.New("field is required")
 
 	// Could not parse the string value
 	ErrParsing = errors.New("failed parsing")
@@ -21,8 +27,10 @@ var (
 )
 
 const (
-	missingValueErrFormat           = `%w: "%v" is required`
 	unsupportedTypeErrFormat        = `%w: cannot handle type "%v" at "%v"`
+	unsupportedFileExtErrFormat     = `%w: %v`
+	decodeFailedErrFormat           = `failed to decode: %w`
+	requiredFieldErrFormat          = `%w: no value found for "%v"`
 	unsupportedElementTypeErrFormat = `%w: cannot handle slice/array of "%v" at "%v"`
 	parseErrFormat                  = `%w at "%v": %v`
 	overflowErrFormat               = `%w: "%v" overflows type "%v" at "%v"`
