@@ -46,7 +46,7 @@ type ConfigTags struct {
 }
 
 // Returns default config tags.
-func getTags(st reflect.StructTag) *ConfigTags {
+func extractTags(st reflect.StructTag) *ConfigTags {
 	tags := ConfigTags{
 		Config:    st.Get("config"),
 		Default:   st.Get("default"),

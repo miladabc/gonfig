@@ -16,23 +16,6 @@ type Config struct {
 	ce ConfigErrors
 }
 
-// Provider is used to provide values
-// It can implement either Unmarshaler or Filler interface or both
-// Name method is used for error messages
-type Provider interface {
-	Name() string
-}
-
-// Unmarshaler can be implemented by providers to receive struct pointer and unmarshal values into it
-type Unmarshaler interface {
-	UnmarshalStruct(i interface{}) (err error)
-}
-
-// Filler can be implemented by providers to receive struct fields and set their value
-type Filler interface {
-	Fill(in *Input) (err error)
-}
-
 // Load creates a new Config object
 func Load() *Config {
 	return &Config{}
@@ -40,33 +23,24 @@ func Load() *Config {
 
 // FromEnv adds an EnvProvider to Providers list
 func (c *Config) FromEnv() *Config {
-	return c.FromEnvWithConfig(NewEnvProvider())
-}
-
-// FromEnvWithConfig adds an EnvProvider to Providers list with specified config
-func (c *Config) FromEnvWithConfig(ep *EnvProvider) *Config {
-	c.Providers = append(c.Providers, ep)
-	return c
+	return c.AddProvider(NewEnvProvider())
 }
 
 // FromFile adds a FileProvider to Providers list
 // In case of .env file, it adds a EnvProvider to the list
 func (c *Config) FromFile(path string) *Config {
 	if filepath.Ext(path) == ENV {
-		return c.FromEnvWithConfig(NewEnvFileProvider(path))
+		ep := NewEnvProvider()
+		ep.Source = path
+		return c.AddProvider(NewEnvProvider())
 	}
 
-	return c.FromFileWithConfig(NewFileProvider(path))
+	return c.AddProvider(NewFileProvider(path))
 }
 
-// FromRequiredFile adds a FileProvider to Providers list with specified config
-// In case of .env file, it adds a EnvProvider to the list
-func (c *Config) FromFileWithConfig(fp *FileProvider) *Config {
-	if fp.FileExt == ENV || filepath.Ext(fp.FilePath) == ENV {
-		return c.FromEnvWithConfig(NewEnvFileProvider(fp.FilePath))
-	}
-
-	c.Providers = append(c.Providers, fp)
+// AddProvider adds a Provider to Providers list
+func (c *Config) AddProvider(p Provider) *Config {
+	c.Providers = append(c.Providers, p)
 	return c
 }
 
@@ -82,13 +56,13 @@ func (c *Config) Into(i interface{}) error {
 	for _, p := range c.Providers {
 		if u, ok := p.(Unmarshaler); ok {
 			if err := u.UnmarshalStruct(i); err != nil {
-				c.collectError(err)
+				c.collectError(fmt.Errorf("%v: %w", p.Name(), err))
 			}
 		}
 
 		if f, ok := p.(Filler); ok {
 			if err := f.Fill(in); err != nil {
-				c.collectError(err)
+				c.collectError(fmt.Errorf("%v: %w", p.Name(), err))
 			}
 		}
 	}
@@ -98,7 +72,7 @@ func (c *Config) Into(i interface{}) error {
 			if f.Tags.Required {
 				c.collectError(fmt.Errorf(requiredFieldErrFormat, ErrRequiredField, in.getPath(f.Path)))
 			} else if f.Tags.Default != "" {
-				err := in.setValue(f, f.Tags.Default)
+				err := in.SetValue(f, f.Tags.Default)
 				if err != nil {
 					c.collectError(err)
 				}
@@ -106,7 +80,7 @@ func (c *Config) Into(i interface{}) error {
 		}
 
 		if f.Tags.Expand && f.Value.Kind() == reflect.String {
-			err := in.setValue(f, f.Value.String())
+			err := in.SetValue(f, f.Value.String())
 			if err != nil {
 				c.collectError(err)
 			}

@@ -32,6 +32,12 @@ type FileProvider struct {
 	Required bool
 }
 
+var (
+	_ Provider    = (*FileProvider)(nil)
+	_ Unmarshaler = (*FileProvider)(nil)
+	_ Filler      = (*FileProvider)(nil)
+)
+
 // NewFileProvider creates a new FileProvider from specified path
 func NewFileProvider(path string) *FileProvider {
 	return &FileProvider{
@@ -43,7 +49,7 @@ func NewFileProvider(path string) *FileProvider {
 
 // Name of provider
 func (fp *FileProvider) Name() string {
-	return "File provider"
+	return fmt.Sprintf("File provider (%v)", fp.FileExt[1:])
 }
 
 // UnmarshalStruct takes a struct pointer and loads values from provided file into it
@@ -73,8 +79,7 @@ func (fp *FileProvider) Fill(in *Input) error {
 			key = f.Tags.Toml
 		}
 
-		_, err := fp.provide(content, key, f.Path)
-		if err == nil {
+		if _, err := fp.provide(content, key, f.Path); err == nil {
 			f.IsSet = true
 		}
 	}
@@ -90,11 +95,11 @@ func (fp *FileProvider) decode(i interface{}) (err error) {
 			return nil
 		}
 
-		return fmt.Errorf("file provider: %w", err)
+		return err
 	}
 	defer func() {
-		if cerr := f.Close(); cerr != nil && err == nil {
-			err = cerr
+		if cErr := f.Close(); cErr != nil && err == nil {
+			err = cErr
 		}
 	}()
 
@@ -121,7 +126,13 @@ func (fp *FileProvider) decode(i interface{}) (err error) {
 
 // provide find a value from file content based on specified key and path
 func (fp *FileProvider) provide(content map[string]interface{}, key string, path []string) (string, error) {
-	return traverseMap(content, fp.buildPath(key, path))
+	builtPath := fp.buildPath(key, path)
+	value, exists := traverseMap(content, builtPath)
+	if !exists {
+		return "", ErrKeyNotFound
+	}
+
+	return value, nil
 }
 
 // buildPath makes a path from key and path slice

@@ -30,6 +30,11 @@ type EnvProvider struct {
 	Required bool
 }
 
+var (
+	_ Provider = (*EnvProvider)(nil)
+	_ Filler   = (*EnvProvider)(nil)
+)
+
 // NewEnvProvider creates a new EnvProvider
 func NewEnvProvider() *EnvProvider {
 	return &EnvProvider{
@@ -38,18 +43,6 @@ func NewEnvProvider() *EnvProvider {
 		UpperCase:      true,
 		FieldSeparator: "_",
 		Source:         "",
-		Required:       false,
-	}
-}
-
-// NewEnvFileProvider creates a new EnvProvider from .env file
-func NewEnvFileProvider(path string) *EnvProvider {
-	return &EnvProvider{
-		EnvPrefix:      "",
-		SnakeCase:      true,
-		UpperCase:      true,
-		FieldSeparator: "_",
-		Source:         path,
 		Required:       false,
 	}
 }
@@ -76,7 +69,7 @@ func (ep *EnvProvider) Fill(in *Input) error {
 			return err
 		}
 
-		err = in.setValue(f, value)
+		err = in.SetValue(f, value)
 		if err != nil {
 			return err
 		}
@@ -87,8 +80,7 @@ func (ep *EnvProvider) Fill(in *Input) error {
 	return nil
 }
 
-// envMap returns environment variables map from either OS or file specified by source
-// Defaults to operating system env variables
+// envMap joins env vars from OS and optional env file and returns corresponding map
 func (ep *EnvProvider) envMap() (map[string]string, error) {
 	envs := envFromOS()
 	var fileEnvs map[string]string

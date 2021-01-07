@@ -91,7 +91,7 @@ func (in *Input) traverseFiled(f *Field) error {
 		for i := 0; i < f.Value.NumField(); i++ {
 			nestedField := Field{
 				Value: f.Value.Field(i),
-				Tags:  getTags(f.Value.Type().Field(i).Tag),
+				Tags:  extractTags(f.Value.Type().Field(i).Tag),
 				Path:  append(f.Path, f.Value.Type().Field(i).Name),
 			}
 
@@ -151,223 +151,51 @@ func (in *Input) collectField(f *Field) {
 	in.Fields = append(in.Fields, f)
 }
 
-// setValue validates and sets the value of a struct field
-func (in *Input) setValue(f *Field, value string) error {
+// SetValue validates and sets the value of a struct field
+func (in *Input) SetValue(f *Field, value string) error {
 	if f.Tags.Expand {
 		value = os.ExpandEnv(value)
 	}
 
 	switch f.Value.Kind() {
 	case reflect.String:
-		f.Value.SetString(value)
+		return in.setString(f, value)
 
 	case reflect.Bool:
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf(
-				parseErrFormat,
-				ErrParsing, in.getPath(f.Path), err,
-			)
-		}
-
-		f.Value.SetBool(b)
+		return in.setBool(f, value)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		var d time.Duration
-		var i int64
-		var err error
-
 		if isDuration(f.Value) {
-			d, err = time.ParseDuration(value)
-			if err != nil {
-				return fmt.Errorf(
-					parseErrFormat,
-					ErrParsing, in.getPath(f.Path), err,
-				)
-			}
-
-			i = int64(d)
-		} else {
-			i, err = strconv.ParseInt(value, 0, 64)
-			if err != nil {
-				return fmt.Errorf(
-					parseErrFormat,
-					ErrParsing, in.getPath(f.Path), err,
-				)
-			}
+			return in.setDuration(f, value)
 		}
 
-		if f.Value.OverflowInt(i) {
-			return fmt.Errorf(
-				overflowErrFormat,
-				ErrValueOverflow, i, f.Value.Kind(), in.getPath(f.Path),
-			)
-		}
-
-		f.Value.SetInt(i)
+		return in.setInt(f, value)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		i, err := strconv.ParseUint(value, 0, 64)
-		if err != nil {
-			return fmt.Errorf(
-				parseErrFormat,
-				ErrParsing, in.getPath(f.Path), err,
-			)
-		}
-
-		if f.Value.OverflowUint(i) {
-			return fmt.Errorf(
-				overflowErrFormat,
-				ErrValueOverflow, i, f.Value.Kind(), in.getPath(f.Path),
-			)
-		}
-
-		f.Value.SetUint(i)
+		return in.setUint(f, value)
 
 	case reflect.Float32, reflect.Float64:
-		fv, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return fmt.Errorf(
-				parseErrFormat,
-				ErrParsing, in.getPath(f.Path), err,
-			)
-		}
-
-		if f.Value.OverflowFloat(fv) {
-			return fmt.Errorf(
-				overflowErrFormat,
-				ErrValueOverflow, fv, f.Value.Kind(), in.getPath(f.Path),
-			)
-		}
-
-		f.Value.SetFloat(fv)
+		return in.setFloat(f, value)
 
 	case reflect.Complex64, reflect.Complex128:
-		cx, err := strconv.ParseComplex(value, 64)
-		if err != nil {
-			return fmt.Errorf(
-				parseErrFormat,
-				ErrParsing, in.getPath(f.Path), err,
-			)
-		}
-
-		if f.Value.OverflowComplex(cx) {
-			return fmt.Errorf(
-				overflowErrFormat,
-				ErrValueOverflow, cx, f.Value.Kind(), in.getPath(f.Path),
-			)
-		}
-
-		f.Value.SetComplex(cx)
+		return in.setComplex(f, value)
 
 	case reflect.Slice, reflect.Array:
-		switch f.Value.Type().Elem().Kind() {
-		case reflect.Slice,
-			reflect.Array,
-			reflect.Uintptr,
-			reflect.Chan,
-			reflect.Func,
-			reflect.Interface,
-			reflect.UnsafePointer:
-			return fmt.Errorf(
-				unsupportedElementTypeErrFormat,
-				ErrUnsupportedType, f.Value.Type().Elem().Kind(), in.getPath(f.Path),
-			)
-		}
-
-		var items []string
-		for _, v := range strings.Split(value, f.Tags.Separator) {
-			item := strings.TrimSpace(v)
-			if len(item) > 0 {
-				items = append(items, item)
-			}
-		}
-		if len(items) == 0 {
-			return nil
-		}
-
-		switch f.Value.Kind() {
-		case reflect.Slice:
-			size := len(items)
-			sv := reflect.MakeSlice(reflect.SliceOf(f.Value.Type().Elem()), size, size)
-
-			for i := range items {
-				nestedField := Field{
-					Value: sv.Index(i),
-					Tags:  f.Tags,
-					Path:  f.Path,
-				}
-
-				if err := in.setValue(&nestedField, items[i]); err != nil {
-					return err
-				}
-			}
-
-			f.Value.Set(sv)
-
-		case reflect.Array:
-			size := f.Value.Len()
-			if size == 0 {
-				return nil
-			}
-
-			at := reflect.ArrayOf(size, f.Value.Type().Elem())
-			av := reflect.New(at).Elem()
-
-			for i := 0; i < size; i++ {
-				nestedField := Field{
-					Value: av.Index(i),
-					Tags:  f.Tags,
-					Path:  f.Path,
-				}
-
-				if err := in.setValue(&nestedField, items[i]); err != nil {
-					return err
-				}
-			}
-
-			f.Value.Set(av)
-		}
+		return in.setList(f, value)
 
 	case reflect.Map:
-		// TODO
+		return in.setMap(f, value)
 
 	case reflect.Ptr:
-		pv := reflect.New(f.Value.Type().Elem())
-		f.Value.Set(pv)
-		pointedField := Field{
-			Value: pv.Elem(),
-			Tags:  f.Tags,
-			Path:  f.Path,
-		}
-
-		return in.setValue(&pointedField, value)
+		return in.setPointer(f, value)
 
 	case reflect.Struct:
 		if isTime(f.Value) {
-			t, err := time.Parse(f.Tags.Format, value)
-			if err != nil {
-				return fmt.Errorf(
-					parseErrFormat,
-					ErrParsing, in.getPath(f.Path), err,
-				)
-			}
-
-			f.Value.Set(reflect.ValueOf(t))
-			return nil
+			return in.setTime(f, value)
 		}
 
 		if isURL(f.Value) {
-			u, err := url.Parse(value)
-			if err != nil {
-				return fmt.Errorf(
-					parseErrFormat,
-					ErrParsing, in.getPath(f.Path), err,
-				)
-			}
-
-			f.Value.Set(reflect.ValueOf(*u))
-			return nil
+			return in.setUrl(f, value)
 		}
 
 	default:
@@ -377,6 +205,247 @@ func (in *Input) setValue(f *Field, value string) error {
 		)
 	}
 
+	return nil
+}
+
+func (in *Input) setString(f *Field, value string) error {
+	f.Value.SetString(value)
+	return nil
+}
+
+func (in *Input) setBool(f *Field, value string) error {
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+
+	f.Value.SetBool(b)
+	return nil
+}
+
+func (in *Input) setInt(f *Field, value string) error {
+	i, err := strconv.ParseInt(value, 0, 64)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+	if f.Value.OverflowInt(i) {
+		return fmt.Errorf(
+			overflowErrFormat,
+			ErrValueOverflow, i, f.Value.Kind(), in.getPath(f.Path),
+		)
+	}
+
+	f.Value.SetInt(i)
+	return nil
+}
+
+func (in *Input) setUint(f *Field, value string) error {
+	i, err := strconv.ParseUint(value, 0, 64)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+	if f.Value.OverflowUint(i) {
+		return fmt.Errorf(
+			overflowErrFormat,
+			ErrValueOverflow, i, f.Value.Kind(), in.getPath(f.Path),
+		)
+	}
+
+	f.Value.SetUint(i)
+	return nil
+}
+
+func (in *Input) setFloat(f *Field, value string) error {
+	fv, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+	if f.Value.OverflowFloat(fv) {
+		return fmt.Errorf(
+			overflowErrFormat,
+			ErrValueOverflow, fv, f.Value.Kind(), in.getPath(f.Path),
+		)
+	}
+
+	f.Value.SetFloat(fv)
+	return nil
+}
+
+func (in *Input) setComplex(f *Field, value string) error {
+	c, err := strconv.ParseComplex(value, 64)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+	if f.Value.OverflowComplex(c) {
+		return fmt.Errorf(
+			overflowErrFormat,
+			ErrValueOverflow, c, f.Value.Kind(), in.getPath(f.Path),
+		)
+	}
+
+	f.Value.SetComplex(c)
+	return nil
+}
+
+func (in *Input) setList(f *Field, value string) error {
+	switch f.Value.Type().Elem().Kind() {
+	case reflect.Slice,
+		reflect.Array,
+		reflect.Uintptr,
+		reflect.Chan,
+		reflect.Func,
+		reflect.Interface,
+		reflect.UnsafePointer:
+		return fmt.Errorf(
+			unsupportedElementTypeErrFormat,
+			ErrUnsupportedType, f.Value.Type().Elem().Kind(), in.getPath(f.Path),
+		)
+	}
+
+	var items []string
+	for _, v := range strings.Split(value, f.Tags.Separator) {
+		item := strings.TrimSpace(v)
+		if len(item) > 0 {
+			items = append(items, item)
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	switch f.Value.Kind() {
+	case reflect.Slice:
+		return in.setSlice(f, items)
+
+	case reflect.Array:
+		return in.setArray(f, items)
+	}
+
+	return nil
+}
+
+func (in *Input) setSlice(f *Field, items []string) error {
+	size := len(items)
+	if size == 0 {
+		return nil
+	}
+	s := reflect.MakeSlice(reflect.SliceOf(f.Value.Type().Elem()), size, size)
+
+	for i := range items {
+		nestedField := Field{
+			Value: s.Index(i),
+			Tags:  f.Tags,
+			Path:  f.Path,
+		}
+
+		if err := in.SetValue(&nestedField, items[i]); err != nil {
+			return err
+		}
+	}
+
+	f.Value.Set(s)
+	return nil
+}
+
+func (in *Input) setArray(f *Field, items []string) error {
+	size := f.Value.Len()
+	if size == 0 || len(items) == 0 {
+		return nil
+	}
+
+	at := reflect.ArrayOf(size, f.Value.Type().Elem())
+	av := reflect.New(at).Elem()
+
+	for i := 0; i < size; i++ {
+		nestedField := Field{
+			Value: av.Index(i),
+			Tags:  f.Tags,
+			Path:  f.Path,
+		}
+
+		if err := in.SetValue(&nestedField, items[i]); err != nil {
+			return err
+		}
+	}
+
+	f.Value.Set(av)
+	return nil
+}
+
+func (in *Input) setMap(f *Field, value string) error {
+	// TODO
+	return nil
+}
+
+func (in *Input) setPointer(f *Field, value string) error {
+	p := reflect.New(f.Value.Type().Elem())
+	f.Value.Set(p)
+	pointedField := Field{
+		Value: p.Elem(),
+		Tags:  f.Tags,
+		Path:  f.Path,
+	}
+
+	return in.SetValue(&pointedField, value)
+}
+
+func (in *Input) setDuration(f *Field, value string) error {
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+	if f.Value.OverflowInt(int64(d)) {
+		return fmt.Errorf(
+			overflowErrFormat,
+			ErrValueOverflow, d, f.Value.Kind(), in.getPath(f.Path),
+		)
+	}
+
+	f.Value.SetInt(int64(d))
+	return nil
+}
+
+func (in *Input) setTime(f *Field, value string) error {
+	t, err := time.Parse(f.Tags.Format, value)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+
+	f.Value.Set(reflect.ValueOf(t))
+	return nil
+}
+
+func (in *Input) setUrl(f *Field, value string) error {
+	u, err := url.Parse(value)
+	if err != nil {
+		return fmt.Errorf(
+			parseErrFormat,
+			ErrParsing, in.getPath(f.Path), err,
+		)
+	}
+
+	f.Value.Set(reflect.ValueOf(*u))
 	return nil
 }
 

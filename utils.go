@@ -34,9 +34,9 @@ func isURL(v reflect.Value) bool {
 }
 
 // traverseMap finds a value in a map based on provided path
-func traverseMap(m map[string]interface{}, path []string) (string, error) {
+func traverseMap(m map[string]interface{}, path []string) (string, bool) {
 	if len(path) == 0 {
-		return "", ErrKeyNotFound
+		return "", false
 	}
 	first, path := path[0], path[1:]
 
@@ -44,17 +44,17 @@ func traverseMap(m map[string]interface{}, path []string) (string, error) {
 	if !exists {
 		value, exists = m[strings.ToLower(first)]
 		if !exists {
-			return "", ErrKeyNotFound
+			return "", false
 		}
 	}
 
 	if len(path) == 0 {
-		return fmt.Sprint(value), nil
+		return fmt.Sprint(value), true
 	}
 
 	nestedMap, ok := value.(map[string]interface{})
 	if !ok {
-		return "", ErrKeyNotFound
+		return "", false
 	}
 
 	return traverseMap(nestedMap, path)
