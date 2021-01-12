@@ -39,7 +39,7 @@ type Field struct {
 func NewInput(i interface{}) (*Input, error) {
 	v := reflect.ValueOf(i)
 
-	if err := checkInput(v); err != nil {
+	if err := validateInput(v); err != nil {
 		return nil, err
 	}
 
@@ -52,21 +52,21 @@ func NewInput(i interface{}) (*Input, error) {
 		Tags:  &ConfigTags{},
 	}
 
-	if err := in.traverseFiled(&f); err != nil {
+	if err := in.traverseField(&f); err != nil {
 		return nil, err
 	}
 
 	return &in, nil
 }
 
-// checkInput checks for a non-nil struct pointer
-func checkInput(v reflect.Value) error {
-	if v.Type() == nil ||
+// validateInput checks for a non-nil struct pointer
+func validateInput(v reflect.Value) error {
+	if !v.IsValid() ||
+		v.Type() == nil ||
 		v.Type().Kind() != reflect.Ptr ||
 		v.IsNil() ||
 		v.Type().Elem().Kind() != reflect.Struct {
 		return &InvalidInputError{
-			Type:  v.Type(),
 			Value: v,
 		}
 	}
@@ -74,8 +74,8 @@ func checkInput(v reflect.Value) error {
 	return nil
 }
 
-// traverseFiled recursively traverse all fields and collect their information
-func (in *Input) traverseFiled(f *Field) error {
+// traverseField recursively traverse all fields and collect their information
+func (in *Input) traverseField(f *Field) error {
 	if !f.Value.CanSet() || f.Tags.Ignore {
 		return nil
 	}
@@ -95,7 +95,7 @@ func (in *Input) traverseFiled(f *Field) error {
 				Path:  append(f.Path, f.Value.Type().Field(i).Name),
 			}
 
-			if err := in.traverseFiled(&nestedField); err != nil {
+			if err := in.traverseField(&nestedField); err != nil {
 				return err
 			}
 		}
@@ -110,7 +110,7 @@ func (in *Input) traverseFiled(f *Field) error {
 			Path:  f.Path,
 		}
 
-		return in.traverseFiled(&pointedField)
+		return in.traverseField(&pointedField)
 
 	case reflect.Slice, reflect.Array:
 		switch f.Value.Type().Elem().Kind() {

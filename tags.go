@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	defaultSeparator = " "
 	ignoreCharacter  = "-"
+	defaultSeparator = " "
+	defaultFormat    = time.RFC3339
 )
 
 // Possible tags, all are optional
@@ -49,10 +50,10 @@ type ConfigTags struct {
 func extractTags(st reflect.StructTag) *ConfigTags {
 	tags := ConfigTags{
 		Config:    st.Get("config"),
-		Default:   st.Get("default"),
 		Json:      extractKeyName(st.Get("json")),
 		Yaml:      extractKeyName(st.Get("yaml")),
 		Toml:      extractKeyName(st.Get("toml")),
+		Default:   st.Get("default"),
 		Required:  st.Get("required") == "true",
 		Ignore:    st.Get("ignore") == "true",
 		Expand:    st.Get("expand") == "true",
@@ -67,7 +68,7 @@ func extractTags(st reflect.StructTag) *ConfigTags {
 		tags.Separator = defaultSeparator
 	}
 	if tags.Format == "" {
-		tags.Format = time.RFC3339
+		tags.Format = defaultFormat
 	}
 
 	return &tags

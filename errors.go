@@ -39,16 +39,20 @@ const (
 // An InvalidInputError describes an invalid argument passed to Into function
 // The argument must be a non-nil struct pointer
 type InvalidInputError struct {
-	Type  reflect.Type
 	Value reflect.Value
 }
 
 func (e *InvalidInputError) Error() string {
 	msg := "gonfig: invalid input: "
+	var t reflect.Type
 
-	if e.Type == nil {
-		msg += "nil"
-	} else if e.Type.Kind() != reflect.Ptr {
+	if e.Value.IsValid() {
+		t = e.Value.Type()
+	}
+
+	if t == nil {
+		msg += "<nil>"
+	} else if t.Kind() != reflect.Ptr {
 		msg += "non-pointer type"
 	} else if e.Value.IsNil() {
 		msg += "nil pointer"
