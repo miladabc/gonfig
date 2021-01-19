@@ -21,16 +21,20 @@ func toSnakeCase(s string) string {
 	return out
 }
 
-func isDuration(v reflect.Value) bool {
-	return v.Type().PkgPath() == "time" && v.Type().Name() == "Duration"
+func isStruct(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct && !isTime(t) && !isURL(t)
 }
 
-func isTime(v reflect.Value) bool {
-	return v.Type().PkgPath() == "time" && v.Type().Name() == "Time"
+func isDuration(t reflect.Type) bool {
+	return t.PkgPath() == "time" && t.Name() == "Duration"
 }
 
-func isURL(v reflect.Value) bool {
-	return v.Type().PkgPath() == "net/url" && v.Type().Name() == "URL"
+func isTime(t reflect.Type) bool {
+	return t.PkgPath() == "time" && t.Name() == "Time"
+}
+
+func isURL(t reflect.Type) bool {
+	return t.PkgPath() == "net/url" && t.Name() == "URL"
 }
 
 // traverseMap finds a value in a map based on provided path
@@ -58,4 +62,17 @@ func traverseMap(m map[string]interface{}, path []string) (string, bool) {
 	}
 
 	return traverseMap(nestedMap, path)
+}
+
+// extractItems splits and trims input string based on separator
+func extractItems(str string, sep string) []string {
+	var items []string
+	for _, v := range strings.Split(str, sep) {
+		item := strings.TrimSpace(v)
+		if len(item) > 0 {
+			items = append(items, item)
+		}
+	}
+
+	return items
 }

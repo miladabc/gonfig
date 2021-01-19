@@ -13,6 +13,9 @@ var (
 	// Only ".json", ".yml", ".yaml" and ".env" file types are supported
 	ErrUnsupportedFileExt = errors.New("unsupported file extension")
 
+	// Struct field is unexported
+	ErrUnSettableField = errors.New("unSettable field")
+
 	// Provider could not find value with specified key
 	ErrKeyNotFound = errors.New("key not found")
 
@@ -27,13 +30,14 @@ var (
 )
 
 const (
-	unsupportedTypeErrFormat        = `%w: cannot handle type "%v" at "%v"`
-	unsupportedFileExtErrFormat     = `%w: %v`
-	decodeFailedErrFormat           = `failed to decode: %w`
-	requiredFieldErrFormat          = `%w: no value found for "%v"`
-	unsupportedElementTypeErrFormat = `%w: cannot handle slice/array of "%v" at "%v"`
-	parseErrFormat                  = `%w at "%v": %v`
-	overflowErrFormat               = `%w: "%v" overflows type "%v" at "%v"`
+	unsupportedTypeErrFormat    = `%w: %v`
+	badFieldErrFormat           = `bad field "%v": %w`
+	unsupportedFileExtErrFormat = `%w: %v`
+	unSettableFieldErrFormat    = `%w: %v`
+	decodeFailedErrFormat       = `failed to decode: %w`
+	requiredFieldErrFormat      = `%w: no value found for "%v"`
+	parseErrFormat              = `%w at "%v": %v`
+	overflowErrFormat           = `%w: "%v" overflows type "%v" at "%v"`
 )
 
 // An InvalidInputError describes an invalid argument passed to Into function
