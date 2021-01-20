@@ -54,13 +54,16 @@ func (ep *EnvProvider) Name() string {
 
 // Fill takes struct fields and fills their values
 func (ep *EnvProvider) Fill(in *Input) error {
-	content, err := ep.envMap()
+	envs, err := ep.envMap()
 	if err != nil {
 		return err
 	}
+	if len(envs) == 0 {
+		return nil
+	}
 
 	for _, f := range in.Fields {
-		value, err := ep.provide(content, f.Tags.Config, f.Path)
+		value, err := ep.provide(envs, f.Tags.Config, f.Path)
 		if err != nil {
 			if errors.Is(err, ErrKeyNotFound) {
 				continue
@@ -84,15 +87,15 @@ func (ep *EnvProvider) Fill(in *Input) error {
 func (ep *EnvProvider) envMap() (map[string]string, error) {
 	envs := envFromOS()
 	var fileEnvs map[string]string
-	var err error
 
 	if ep.Source != "" {
+		var err error
 		fileEnvs, err = envFromFile(ep.Source)
-	}
-	if err != nil {
-		notExistsErr := errors.Is(err, os.ErrNotExist)
-		if (notExistsErr && ep.Required) || !notExistsErr {
-			return nil, err
+		if err != nil {
+			notExistsErr := errors.Is(err, os.ErrNotExist)
+			if (notExistsErr && ep.Required) || !notExistsErr {
+				return nil, err
+			}
 		}
 	}
 
