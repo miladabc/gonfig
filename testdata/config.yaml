@@ -1,0 +1,4 @@
+config:
+  host: golang.org
+
+custom_key: custom

@@ -100,6 +100,24 @@ func TestEnvProvider_Fill(t *testing.T) {
 		}
 	})
 
+	t.Run("config key", func(t *testing.T) {
+		os.Clearenv()
+		err := os.Setenv("CUSTOM_KEY", "env")
+		require.NoError(t, err)
+
+		s := struct {
+			Env string `config:"CUSTOM_KEY"`
+		}{}
+		in, err := NewInput(&s)
+		require.NoError(t, err)
+		require.NotNil(t, in)
+		ep := EnvProvider{}
+
+		err = ep.Fill(in)
+		require.NoError(t, err)
+		assert.Equal(t, "env", s.Env)
+	})
+
 	t.Run("env prefix", func(t *testing.T) {
 		os.Clearenv()
 		err := os.Setenv("APP_Env", "env")

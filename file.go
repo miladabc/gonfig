@@ -2,7 +2,9 @@ package gonfig
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -15,8 +17,8 @@ const (
 	JSON = ".json"
 	YML  = ".yml"
 	YAML = ".yaml"
-	ENV  = ".env"
 	TOML = ".toml"
+	ENV  = ".env"
 )
 
 // FileProvider loads values from file to provided struct
@@ -89,6 +91,12 @@ func (fp *FileProvider) Fill(in *Input) error {
 
 // decode opens specified file and loads its content to input argument
 func (fp *FileProvider) decode(i interface{}) (err error) {
+	switch fp.FileExt {
+	case JSON, YML, YAML, TOML:
+	default:
+		return fmt.Errorf(unsupportedFileExtErrFormat, ErrUnsupportedFileExt, fp.FileExt)
+	}
+
 	f, err := os.Open(fp.FilePath)
 	if err != nil {
 		if os.IsNotExist(err) && !fp.Required {
@@ -112,12 +120,9 @@ func (fp *FileProvider) decode(i interface{}) (err error) {
 
 	case TOML:
 		_, err = toml.DecodeReader(f, i)
-
-	default:
-		err = fmt.Errorf(unsupportedFileExtErrFormat, ErrUnsupportedFileExt, fp.FileExt)
 	}
 
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf(decodeFailedErrFormat, err)
 	}
 

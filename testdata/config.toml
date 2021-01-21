@@ -1,0 +1,4 @@
+custom_key = "custom"
+
+[config]
+host = "golang.org"

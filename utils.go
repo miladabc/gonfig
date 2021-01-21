@@ -58,7 +58,15 @@ func traverseMap(m map[string]interface{}, path []string) (string, bool) {
 
 	nestedMap, ok := value.(map[string]interface{})
 	if !ok {
-		return "", false
+		nestedInterfaceMap, ok := value.(map[interface{}]interface{})
+		if !ok {
+			return "", false
+		}
+
+		nestedMap = make(map[string]interface{})
+		for k, v := range nestedInterfaceMap {
+			nestedMap[fmt.Sprint(k)] = v
+		}
 	}
 
 	return traverseMap(nestedMap, path)
