@@ -12,7 +12,8 @@ const (
 	defaultFormat    = time.RFC3339
 )
 
-// Possible tags, all are optional
+// ConfigTags indicates possible tags
+// All of them are optional
 type ConfigTags struct {
 	// Key to be used by providers to retrieve the needed value, defaults to field name.
 	// Use "-" to ignore the field.

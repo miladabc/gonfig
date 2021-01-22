@@ -19,7 +19,7 @@ type Input struct {
 	Fields []*Field
 }
 
-// Struct field information
+// Field information
 type Field struct {
 	// Field value
 	Value reflect.Value

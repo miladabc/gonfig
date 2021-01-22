@@ -7,25 +7,26 @@ import (
 )
 
 var (
-	// Can not handle specified type
+	// ErrUnsupportedType indicates unsupported struct field
 	ErrUnsupportedType = errors.New("unsupported type")
 
+	// ErrUnsupportedFileExt indicated unsupported file format
 	// Only ".json", ".yml", ".yaml" and ".env" file types are supported
 	ErrUnsupportedFileExt = errors.New("unsupported file extension")
 
-	// Struct field is unexported
+	// ErrUnSettableField indicated unexported struct field
 	ErrUnSettableField = errors.New("unSettable field")
 
-	// Provider could not find value with specified key
+	// ErrKeyNotFound is returned when no value found with specified key
 	ErrKeyNotFound = errors.New("key not found")
 
-	// Field is required but no value provided
+	// ErrRequiredField indicates that Field is required but no value is provided
 	ErrRequiredField = errors.New("field is required")
 
-	// Could not parse the string value
+	// ErrParsing is returned in case of bad value
 	ErrParsing = errors.New("failed parsing")
 
-	// Value overflows type
+	// ErrValueOverflow indicates value overflow
 	ErrValueOverflow = errors.New("value overflow")
 )
 
@@ -67,7 +68,7 @@ func (e *InvalidInputError) Error() string {
 	return msg
 }
 
-// Collection of errors during populating the input struct
+// ConfigErrors is collection of errors during populating the input struct
 type ConfigErrors []error
 
 func (ce ConfigErrors) Error() string {
