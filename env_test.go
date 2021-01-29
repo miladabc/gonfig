@@ -12,7 +12,7 @@ import (
 func TestNewEnvProvider(t *testing.T) {
 	ep := NewEnvProvider()
 	require.NotNil(t, ep)
-	assert.Equal(t, "", ep.EnvPrefix)
+	assert.Equal(t, "", ep.Prefix)
 	assert.Equal(t, true, ep.SnakeCase)
 	assert.Equal(t, true, ep.UpperCase)
 	assert.Equal(t, "_", ep.FieldSeparator)
@@ -131,7 +131,7 @@ func TestEnvProvider_Fill(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, in)
 		ep := EnvProvider{
-			EnvPrefix: "APP_",
+			Prefix: "APP_",
 		}
 
 		err = ep.Fill(in)

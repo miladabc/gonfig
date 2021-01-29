@@ -11,7 +11,7 @@ import (
 // EnvProvider loads values from environment variables to provided struct
 type EnvProvider struct {
 	// Prefix is used when finding values from environment variables, defaults to ""
-	EnvPrefix string
+	Prefix string
 
 	// SnakeCase specifies whether to convert field names to snake_case or not, defaults to true
 	SnakeCase bool
@@ -38,7 +38,7 @@ var (
 // NewEnvProvider creates a new EnvProvider
 func NewEnvProvider() *EnvProvider {
 	return &EnvProvider{
-		EnvPrefix:      "",
+		Prefix:         "",
 		SnakeCase:      true,
 		UpperCase:      true,
 		FieldSeparator: "_",
@@ -162,7 +162,7 @@ func (ep *EnvProvider) provide(content map[string]string, key string, path []str
 // buildKey prefix key with EnvPrefix, if not provided, path slice will be used
 func (ep *EnvProvider) buildKey(key string, path []string) string {
 	if key != "" {
-		return ep.EnvPrefix + key
+		return ep.Prefix + key
 	}
 
 	k := strings.Join(path, ep.FieldSeparator)
@@ -173,7 +173,7 @@ func (ep *EnvProvider) buildKey(key string, path []string) string {
 		k = strings.ToUpper(k)
 	}
 
-	k = ep.EnvPrefix + k
+	k = ep.Prefix + k
 
 	return k
 }
