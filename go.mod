@@ -1,4 +1,4 @@
-module github.com/milad-abbasi/gonfig
+module github.com/miladabc/gonfig
 
 go 1.15
 

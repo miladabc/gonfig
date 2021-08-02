@@ -1,21 +1,25 @@
 # Gonfig
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/milad-abbasi/gonfig.svg)](https://pkg.go.dev/github.com/milad-abbasi/gonfig)
-![Build Status](https://github.com/milad-abbasi/gonfig/workflows/Build/badge.svg)
-[![codecov](https://codecov.io/gh/milad-abbasi/gonfig/branch/master/graph/badge.svg?token=jv13V1BgIP)](https://codecov.io/gh/milad-abbasi/gonfig)
-[![Go Report Card](https://goreportcard.com/badge/github.com/milad-abbasi/gonfig)](https://goreportcard.com/report/github.com/milad-abbasi/gonfig)
-[![GitHub release](https://img.shields.io/github/release/milad-abbasi/gonfig.svg)](https://gitHub.com/milad-abbasi/gonfig/releases)
+[![Go Reference](https://pkg.go.dev/badge/github.com/miladabc/gonfig.svg)](https://pkg.go.dev/github.com/miladabc/gonfig)
+![Build Status](https://github.com/miladabc/gonfig/workflows/Build/badge.svg)
+[![codecov](https://codecov.io/gh/miladabc/gonfig/branch/master/graph/badge.svg?token=jv13V1BgIP)](https://codecov.io/gh/miladabc/gonfig)
+[![Go Report Card](https://goreportcard.com/badge/github.com/miladabc/gonfig)](https://goreportcard.com/report/github.com/miladabc/gonfig)
+[![GitHub release](https://img.shields.io/github/release/miladabc/gonfig.svg)](https://gitHub.com/miladabc/gonfig/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
 Tag-based configuration parser which loads values from different providers into typesafe struct.
 
 ## Installation
+
 This package needs go version 1.15+
+
 ```bash
-go get -u github.com/milad-abbasi/gonfig
+go get -u github.com/miladabc/gonfig
 ```
 
 ## Usage
+
 ```go
 package main
 
@@ -23,8 +27,8 @@ import (
     "fmt"
     "net/url"
     "time"
-    
-    "github.com/milad-abbasi/gonfig"
+
+    "github.com/miladabc/gonfig"
 )
 
 // Unexported struct fields are ignored
@@ -58,10 +62,13 @@ func main() {
 ```
 
 ## Tags
+
 All the tags are optional.
 
 ### Config
+
 `config` tag is used to change default key for fetching the value of field.
+
 ```go
 type Config struct {
 	HostName string `config:"HOST"`
@@ -76,7 +83,9 @@ func main() {
 ```
 
 ### File related tags
+
 `json`, `yaml` and `toml` tags are used to change default key for fetching the value from file.
+
 ```go
 type Config struct {
 	HostName string `json:"host" yaml:"host" toml:"host"`
@@ -90,7 +99,9 @@ func main() {
 ```
 
 ### Default
+
 `default` tag is used to declare a default value in case of missing value.
+
 ```go
 type Config struct {
 	Host url.URL `default:"golang.org"`
@@ -98,8 +109,10 @@ type Config struct {
 ```
 
 ### Required
+
 `required` tag is used to make sure a value is present for corresponding field.  
 Fields are optional by default.
+
 ```go
 type Config struct {
 	Host url.URL `required:"true"`
@@ -107,8 +120,10 @@ type Config struct {
 ```
 
 ### Ignore
+
 `ignore` tag is used to skip populating a field.
 Ignore is `false` by default.
+
 ```go
 type Config struct {
 	Ignored     int `ignore:"true"`
@@ -117,8 +132,10 @@ type Config struct {
 ```
 
 ### Expand
+
 `expand` tag is used to expand value from OS environment variables.  
 Expand is `false` by default.
+
 ```go
 type Config struct {
 	Expanded int `expand:"true" default:"${ENV_VALUE}"`
@@ -134,8 +151,10 @@ func main() {
 ```
 
 ### Separator
+
 `separator` tag is used to separate slice/array items.  
 Default separator is a single space.
+
 ```go
 type Config struct {
 	List []int `separator:"," default:"1, 2, 3"`
@@ -143,8 +162,10 @@ type Config struct {
 ```
 
 ### Format
-`format` tag is used for parsing time strings.    
+
+`format` tag is used for parsing time strings.  
 Default format is `time.RFC3339`.
+
 ```go
 type Config struct {
 	Time time.Time `format:"2006-01-02T15:04:05.999999999Z07:00"`
@@ -152,16 +173,18 @@ type Config struct {
 ```
 
 ## Providers
+
 Providers can be chained together and they are applied in the specified order.  
 If multiple values are provided for a field, last one will get applied.
 
 ### Supported providers
+
 - Environment variables
 - files
-    - .json
-    - .yaml (.yml)
-    - .toml
-    - .env
+  - .json
+  - .yaml (.yml)
+  - .toml
+  - .env
 
 ```go
 func main() {
@@ -180,6 +203,7 @@ func main() {
 ```
 
 ### Env Provider
+
 Env provider will populate struct fields based on the hierarchy of struct.
 
 ```go
@@ -200,12 +224,15 @@ func main() {
 		Into(&c)
 }
 ```
+
 It will check for following keys:
+
 - `PRETTY_LOG`
 - `REDIS_HOST`
 - `REDIS_PORT`
 
 To change default settings, make an `EnvProvider` and add it to the providers list manually:
+
 ```go
 type Config struct {
 	PrettyLog bool
@@ -233,19 +260,24 @@ func main() {
 		Into(&c)
 }
 ```
+
 It will check for following keys in `.env` file:
+
 - `APP_PrettyLog`
 - `APP_Redis__Host`
 - `APP_Redis__Port`
 
 ### File Provider
+
 File provider uses third party parsers for parsing files, read their documentation for more info.
+
 - [json](https://golang.org/pkg/encoding/json)
 - [yaml](https://github.com/go-yaml/yaml/tree/v3)
 - [toml](https://github.com/BurntSushi/toml)
 - [env](https://github.com/joho/godotenv)
 
 ### Custom Provider
+
 You can use your own provider by implementing `Provider` interface and one or both `Unmarshaler` and `Filler` interfaces.
 
 ```go
@@ -276,7 +308,9 @@ func main() {
 ```
 
 ## Supported types
+
 Any other type except the followings, results an error
+
 - `string`
 - `bool`
 - `int`, `int8`, `int16`, `int32`, `int64`
@@ -289,25 +323,28 @@ Any other type except the followings, results an error
 - [time.Time](https://golang.org/pkg/time/#Time)
 - [url.URL](https://golang.org/pkg/net/url/#URL)
 - `pointer`, `slice` and `array` of above types
-- `nested` and `embedded` structs 
+- `nested` and `embedded` structs
 
 ## TODO
+
 Any contribution is appreciated :)
 
 - [ ] Add support for map data type
-    - [ ] Add support for map slice
+  - [ ] Add support for map slice
 - [ ] Add support for slice of structs
 - [ ] Add support for [encoding.TextUnmarshaler](https://golang.org/pkg/encoding/#TextUnmarshaler) and [encoding.BinaryUnmarshaler](https://golang.org/pkg/encoding/#BinaryUnmarshaler)
 - [ ] Add support for other providers
-    - [ ] command line flags
-    - [ ] [etcd](https://etcd.io)
-    - [ ] [Consul](https://www.consul.io)
-    - [ ] [Vault](https://www.vaultproject.io)
-    - [ ] [Amazon SSM](https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html)
+  - [ ] command line flags
+  - [ ] [etcd](https://etcd.io)
+  - [ ] [Consul](https://www.consul.io)
+  - [ ] [Vault](https://www.vaultproject.io)
+  - [ ] [Amazon SSM](https://docs.aws.amazon.com/systems-manager/latest/userguide/what-is-systems-manager.html)
 
 ## Documentation
-Take a look at [docs](https://pkg.go.dev/github.com/milad-abbasi/gonfig) for more information.
+
+Take a look at [docs](https://pkg.go.dev/github.com/miladabc/gonfig) for more information.
 
 ## License
+
 The library is released under the [MIT license](https://opensource.org/licenses/MIT).  
-Checkout [LICENSE](https://github.com/milad-abbasi/gonfig/blob/master/LICENSE) file.
+Checkout [LICENSE](https://github.com/miladabc/gonfig/blob/master/LICENSE) file.
